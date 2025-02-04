@@ -1,0 +1,5 @@
+selenium
+pandas
+pyinstaller
+odfpy
+webdriver-manager

@@ -9,30 +9,32 @@ import os
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import logging
+import argparse
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class WhatsAppMessageSender:
-    def __init__(self, file):
-        self.file = file
-        self.browser = self.setup_browser()
+class BrowserManager:
+    def __init__(self, detach=True):
+        self.browser = self.setup_browser(detach)
 
-    def setup_browser(self):
+    def setup_browser(self, detach):
         """Configures and returns the browser with automatic ChromeDriver."""
         chrome_service = Service(ChromeDriverManager().install())
         options = webdriver.ChromeOptions()
-        options.add_experimental_option("detach", True)
+        options.add_experimental_option("detach", detach)
         browser = webdriver.Chrome(service=chrome_service, options=options)
         return browser
 
-    def wait_for_element(self, element_id, timeout=30):
-        """Waits until a specific element is loaded in the browser."""
-        for _ in range(timeout):
-            if len(self.browser.find_elements(By.ID, element_id)) > 0:
-                return True
-            time.sleep(1)
-        return False
+    def __enter__(self):
+        return self.browser
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.browser.quit()
+
+class ContactLoader:
+    def __init__(self, file):
+        self.file = file
 
     def load_contacts(self):
         """Loads contacts from the ODS file."""
@@ -41,13 +43,28 @@ class WhatsAppMessageSender:
             return None
         return pd.read_excel(self.file, engine="odf")
 
+class WhatsAppMessageSender:
+    def __init__(self, browser, contacts, wait_timeout=30, message_delay=(10, 15)):
+        self.browser = browser
+        self.contacts = contacts
+        self.wait_timeout = wait_timeout
+        self.message_delay = message_delay
+
+    def wait_for_element(self, element_id):
+        """Waits until a specific element is loaded in the browser."""
+        for _ in range(self.wait_timeout):
+            if len(self.browser.find_elements(By.ID, element_id)) > 0:
+                return True
+            time.sleep(1)
+        return False
+
     def send_message(self, number, message):
         """Sends a message to a specific contact."""
         self.browser.get(f'https://web.whatsapp.com/send?phone={number}&text={message}')
         if self.wait_for_element('main'):
             input_box = self.browser.find_element(By.XPATH, '//*[@id="main"]/footer/div[1]/div/span/div/div[2]/div[1]/div[2]/div/p')
             input_box.send_keys(Keys.ENTER)
-            time.sleep(random.randint(10, 15))
+            time.sleep(random.randint(*self.message_delay))
         else:
             logging.error(f"Error loading the conversation with the number {number}.")
 
@@ -60,13 +77,9 @@ class WhatsAppMessageSender:
             logging.error("Error loading WhatsApp Web.")
             return
 
-        contacts = self.load_contacts()
-        if contacts is None:
-            return
+        base_message = self.contacts['Mensagem Base'].dropna().iloc[0]
 
-        base_message = contacts['Mensagem Base'].dropna().iloc[0]
-
-        for i, row in contacts.iterrows():
+        for i, row in self.contacts.iterrows():
             number = str(row['Contatos']).strip()
             link = row['Link']
             final_message = f"{base_message} {link}"
@@ -74,16 +87,27 @@ class WhatsAppMessageSender:
             self.send_message(number, encoded_final_message)
 
         logging.info("Messages sent successfully!")
-        self.browser.quit()
 
-def main():
+def main(file, detach, wait_timeout, message_delay):
     """Main function of the script."""
     try:
-        file = "Teste.ods"
-        sender = WhatsAppMessageSender(file)
-        sender.send_messages()
+        contact_loader = ContactLoader(file)
+        contacts = contact_loader.load_contacts()
+        if contacts is None:
+            return
+
+        with BrowserManager(detach=detach) as browser:
+            sender = WhatsAppMessageSender(browser, contacts, wait_timeout=wait_timeout, message_delay=message_delay)
+            sender.send_messages()
     except Exception as e:
         logging.error(f"An error occurred: {e}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="WhatsApp Message Sender")
+    parser.add_argument("--file", type=str, default="Teste.ods", help="Path to the contacts file")
+    parser.add_argument("--detach", type=bool, default=True, help="Whether to detach the browser")
+    parser.add_argument("--wait-timeout", type=int, default=30, help="Timeout for waiting for elements")
+    parser.add_argument("--message-delay", type=int, nargs=2, default=[10, 15], help="Delay range for sending messages")
+
+    args = parser.parse_args()
+    main(args.file, args.detach, args.wait_timeout, tuple(args.message_delay))

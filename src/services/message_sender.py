@@ -58,6 +58,10 @@ class WhatsAppMessageSender:
                 continue
             if '.' in number:
                 number = number.split('.')[0]  # Remove decimal part if present
+            if not number.isdigit():
+                logging.warning(
+                    f"Skipping invalid contact at row {i}: {number}")
+                continue
             link = row['Link']
             base_message = random.choice(base_messages)
             final_message = f"{base_message} {link}"

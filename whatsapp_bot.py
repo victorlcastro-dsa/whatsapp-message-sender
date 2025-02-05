@@ -17,8 +17,16 @@ logging.basicConfig(level=logging.INFO,
 
 
 class BrowserManager:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(BrowserManager, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self, detach=True):
-        self.browser = self.setup_browser(detach)
+        if not hasattr(self, 'browser'):
+            self.browser = self.setup_browser(detach)
 
     def setup_browser(self, detach):
         """Configures and returns the browser with automatic ChromeDriver."""
@@ -45,7 +53,11 @@ class ContactLoader:
             logging.error(f"Error: The file '{
                           self.file}' was not found in the folder.")
             return None
-        return pd.read_excel(self.file, engine="odf")
+        try:
+            return pd.read_excel(self.file, engine="odf")
+        except Exception as e:
+            logging.error(f"Error loading contacts: {e}")
+            return None
 
 
 class WhatsAppMessageSender:
@@ -69,10 +81,13 @@ class WhatsAppMessageSender:
         logging.info(f"Sending message to {number} with URL: {url}")
         self.browser.get(url)
         if self.wait_for_element('main'):
-            input_box = self.browser.find_element(
-                By.XPATH, '//*[@id="main"]/footer/div[1]/div/span/div/div[2]/div[1]/div[2]/div/p')
-            input_box.send_keys(Keys.ENTER)
-            time.sleep(random.randint(*self.message_delay))
+            try:
+                input_box = self.browser.find_element(
+                    By.XPATH, '//*[@id="main"]/footer/div[1]/div/span/div/div[2]/div[1]/div[2]/div/p')
+                input_box.send_keys(Keys.ENTER)
+                time.sleep(random.randint(*self.message_delay))
+            except Exception as e:
+                logging.error(f"Error sending message to {number}: {e}")
         else:
             logging.error(
                 f"Error loading the conversation with the number {number}.")

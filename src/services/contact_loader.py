@@ -1,10 +1,11 @@
 import pandas as pd
 import os
 import logging
+from config import config
 
 
 class ContactLoader:
-    def __init__(self, file):
+    def __init__(self, file=config.CONTACTS_FILE_PATH):
         self.file = file
 
     def load_contacts(self):

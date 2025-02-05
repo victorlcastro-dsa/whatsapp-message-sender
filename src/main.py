@@ -1,13 +1,13 @@
 import logging
 import argparse
 from services import BrowserManager, ContactLoader, WhatsAppMessageSender
+from config import config
 
 # Logging configuration
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=config.LOG_LEVEL, format=config.LOG_FORMAT)
 
 
-def main(file, detach, wait_timeout, message_delay):
+def main(file=config.CONTACTS_FILE_PATH, detach=config.BROWSER_DETACH, wait_timeout=config.WAIT_TIMEOUT, message_delay=config.MESSAGE_DELAY):
     """Main function of the script."""
     try:
         contact_loader = ContactLoader(file)
@@ -26,13 +26,13 @@ def main(file, detach, wait_timeout, message_delay):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="WhatsApp Message Sender")
     parser.add_argument(
-        "--file", type=str, default="../Lista de Contatos.ods", help="Path to the contacts file")
-    parser.add_argument("--detach", type=bool, default=True,
+        "--file", type=str, default=config.CONTACTS_FILE_PATH, help="Path to the contacts file")
+    parser.add_argument("--detach", type=bool, default=config.BROWSER_DETACH,
                         help="Whether to detach the browser")
-    parser.add_argument("--wait-timeout", type=int, default=120,
-                        help="Timeout for waiting for elements")
+    parser.add_argument("--wait-timeout", type=int,
+                        default=config.WAIT_TIMEOUT, help="Timeout for waiting for elements")
     parser.add_argument("--message-delay", type=int, nargs=2,
-                        default=[10, 15], help="Delay range for sending messages")
+                        default=config.MESSAGE_DELAY, help="Delay range for sending messages")
 
     args = parser.parse_args()
     main(args.file, args.detach, args.wait_timeout, tuple(args.message_delay))

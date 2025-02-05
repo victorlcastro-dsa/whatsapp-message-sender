@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from config import config
 
 
 class BrowserManager:
@@ -11,7 +12,7 @@ class BrowserManager:
             cls._instance = super(BrowserManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, detach=True):
+    def __init__(self, detach=config.BROWSER_DETACH):
         if not hasattr(self, 'browser'):
             self.browser = self.setup_browser(detach)
 

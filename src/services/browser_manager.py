@@ -13,7 +13,7 @@ class BrowserManager:
         return cls._instance
 
     def __init__(self, detach=config.BROWSER_DETACH):
-        if not hasattr(self, 'browser'):
+        if not hasattr(self, "browser"):
             self.browser = self.setup_browser(detach)
 
     def setup_browser(self, detach):

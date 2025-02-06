@@ -11,8 +11,7 @@ class ContactLoader:
     def load_contacts(self):
         """Loads contacts from the ODS file."""
         if not os.path.exists(self.file):
-            logging.error(f"Error: The file '{
-                          self.file}' was not found in the folder.")
+            logging.error(f"Error: The file '{self.file}' was not found in the folder.")
             return None
         try:
             return pd.read_excel(self.file, engine="odf")

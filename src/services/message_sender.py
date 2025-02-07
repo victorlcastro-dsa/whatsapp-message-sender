@@ -2,38 +2,46 @@ import time
 import random
 import urllib.parse
 import logging
+from typing import List, Tuple
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from pandas import DataFrame
 from config import config
 
 
 class WhatsAppMessageSender:
     def __init__(
         self,
-        browser,
-        contacts,
-        wait_timeout=config.WAIT_TIMEOUT,
-        message_delay=config.MESSAGE_DELAY,
-    ):
+        browser: WebDriver,
+        contacts: DataFrame,
+        wait_timeout: int = config.WAIT_TIMEOUT,
+        message_delay: Tuple[int, int] = config.MESSAGE_DELAY,
+    ) -> None:
         self.browser = browser
         self.contacts = contacts
         self.wait_timeout = wait_timeout
         self.message_delay = message_delay
 
-    def wait_for_element(self, element_id):
+    def _wait_for_element(self, by: By, value: str) -> bool:
         """Waits until a specific element is loaded in the browser."""
-        for _ in range(self.wait_timeout):
-            if len(self.browser.find_elements(By.ID, element_id)) > 0:
-                return True
-            time.sleep(1)
-        return False
+        try:
+            WebDriverWait(self.browser, self.wait_timeout).until(
+                EC.presence_of_element_located((by, value))
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error waiting for element {value}: {e}")
+            return False
 
-    def send_message(self, number, message):
+    def _send_message(self, number: str, message: str) -> None:
         """Sends a message to a specific contact."""
         url = f"https://web.whatsapp.com/send?phone={number}&text={message}"
         logging.info(f"Sending message to {number} with URL: {url}")
         self.browser.get(url)
-        if self.wait_for_element("main"):
+        if self._wait_for_element(By.ID, "main"):
             try:
                 input_box = self.browser.find_element(
                     By.XPATH,
@@ -46,31 +54,42 @@ class WhatsAppMessageSender:
         else:
             logging.error(f"Error loading the conversation with the number {number}.")
 
-    def send_messages(self):
+    @staticmethod
+    def _format_message(base_message: str, link: str) -> str:
+        """Formats the final message to be sent."""
+        if link:
+            final_message = f"{base_message} {link}"
+        else:
+            final_message = base_message
+        return urllib.parse.quote(final_message)
+
+    def send_messages(self) -> None:
         """Sends messages to all loaded contacts."""
         self.browser.get("https://web.whatsapp.com/")
         logging.info("Scan the WhatsApp Web QR Code to continue...")
 
-        if not self.wait_for_element("side"):
+        if not self._wait_for_element(By.ID, "side"):
             logging.error("Error loading WhatsApp Web.")
             return
 
-        base_messages = self.contacts["Mensagem Base"].dropna().tolist()
+        base_messages: List[str] = self.contacts["Mensagem Base"].dropna().tolist()
 
         for i, row in self.contacts.iterrows():
-            number = str(row["Contatos"]).strip()
+            number: str = str(row["Contatos"]).strip()
             if not number or number.lower() == "nan":
                 logging.warning(f"Skipping empty or invalid contact at row {i}.")
                 continue
             if "." in number:
-                number = number.split(".")[0]  # Remove decimal part if present
+                number = number.split(".")[0]
             if not number.isdigit():
                 logging.warning(f"Skipping invalid contact at row {i}: {number}")
                 continue
-            link = row["Link"]
-            base_message = random.choice(base_messages)
-            final_message = f"{base_message} {link}"
-            encoded_final_message = urllib.parse.quote(final_message)
-            self.send_message(number, encoded_final_message)
+            link: str = row.get("Link", "")
+            base_message: str = random.choice(base_messages)
+            encoded_final_message: str = self._format_message(base_message, link)
+            try:
+                self._send_message(number, encoded_final_message)
+            except Exception as e:
+                logging.error(f"Failed to send message to {number}: {e}")
 
         logging.info("Messages sent successfully!")

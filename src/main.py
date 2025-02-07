@@ -1,23 +1,25 @@
 import logging
 import argparse
+from typing import Tuple
 from services import BrowserManager, ContactLoader, WhatsAppMessageSender
 from config import config
 
-# Logging configuration
-logging.basicConfig(level=config.LOG_LEVEL, format=config.LOG_FORMAT)
-
 
 def main(
-    file=config.CONTACTS_FILE_PATH,
-    detach=config.BROWSER_DETACH,
-    wait_timeout=config.WAIT_TIMEOUT,
-    message_delay=config.MESSAGE_DELAY,
-):
+    file: str = config.CONTACTS_FILE_PATH,
+    detach: bool = config.BROWSER_DETACH,
+    wait_timeout: int = config.WAIT_TIMEOUT,
+    message_delay: Tuple[int, int] = config.MESSAGE_DELAY,
+) -> None:
     """Main function of the script."""
+    config.configure_logging()
+    logging.info("Application started")
+
     try:
         contact_loader = ContactLoader(file)
         contacts = contact_loader.load_contacts()
-        if contacts is None:
+        if contacts.empty:
+            logging.error("No contacts loaded. Exiting.")
             return
 
         with BrowserManager(detach=detach) as browser:
@@ -29,7 +31,7 @@ def main(
             )
             sender.send_messages()
     except Exception as e:
-        logging.error(f"An error occurred: {e}")
+        logging.error(f"An unexpected error occurred: {e}")
 
 
 if __name__ == "__main__":
